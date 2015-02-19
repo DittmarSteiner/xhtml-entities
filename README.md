@@ -1,4 +1,4 @@
-XHTML Entities for Android
+XHTML Entities
 ==========================
 
 This utility class encodes and decodes HTML and XML entities. The idea came from 
@@ -40,7 +40,4 @@ License
 	WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN AN
 	ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT OF
 	OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
-
-###*TODO*
-* Deploy @ bintray.com
 
