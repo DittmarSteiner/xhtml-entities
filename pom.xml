@@ -4,8 +4,8 @@
 
     <groupId>com.github.dittmarsteiner</groupId>
     <artifactId>xhtml-entities</artifactId>
-    <version>1.0</version>
-    
+    <version>1.0-SNAPSHOT</version>
+
     <name>XHTML Entities</name>
     <description>Unescapes X(H)TML entities and vice versa.</description>
 
@@ -27,14 +27,60 @@
             <email>dittmar.steiner@gmail.com</email>
         </developer>
     </developers>
-    
+
+    <scm>
+        <connection>scm:git:https://github.com/dittmarsteiner/xhtml-entities.git</connection>
+        <developerConnection>scm:git:git@github.com:dittmarsteiner/xhtml-entities.git</developerConnection>
+        <url>https://github.com/dittmarsteiner/xhtml-entities</url>
+        <tag>1.0</tag>
+    </scm>
+
+    <distributionManagement>
+        <repository>
+            <id>bintray</id>
+            <url>https://api.bintray.com/maven/dittmarsteiner/github-maven/xhtml-entities</url>
+        </repository>
+    </distributionManagement>
+
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
         <java.version>1.8</java.version>
     </properties>
+    
+    <profiles>
+        <profile>
+            <id>release</id>
+            <build>
+                <plugins>
+                    <plugin>
+                        <artifactId>maven-source-plugin</artifactId>
+                        <executions>
+                            <execution>
+                                <id>attach-sources</id>
+                                <goals>
+                                    <goal>jar</goal>
+                                </goals>
+                            </execution>
+                        </executions>
+                    </plugin>
+                    <plugin>
+                        <artifactId>maven-javadoc-plugin</artifactId>
+                        <executions>
+                            <execution>
+                                <id>attach-javadocs</id>
+                                <goals>
+                                    <goal>jar</goal>
+                                </goals>
+                            </execution>
+                        </executions>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+    </profiles>
 
     <build>
-        <finalName>${project.artifactId}</finalName>
+<!--         <finalName>${project.artifactId}</finalName> -->
         <defaultGoal>package</defaultGoal>
 
         <plugins>
@@ -69,6 +115,16 @@
                     </execution>
                 </executions>
             </plugin>
+
+            <plugin>
+                <artifactId>maven-release-plugin</artifactId>
+                <version>2.5.1</version>
+                <configuration>
+                    <useReleaseProfile>false</useReleaseProfile>
+                    <releaseProfiles>release</releaseProfiles>
+                    <autoVersionSubmodules>true</autoVersionSubmodules>
+                </configuration>
+            </plugin>            
         </plugins>
 
         <resources>
