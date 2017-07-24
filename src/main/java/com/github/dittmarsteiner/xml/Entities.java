@@ -18,69 +18,382 @@
  */
 package com.github.dittmarsteiner.xml;
 
+import java.io.IOException;
+import java.io.Reader;
+import java.io.StringReader;
+import java.io.StringWriter;
+import java.io.Writer;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
 
 /**
+ * This utility class encodes and decodes HTML and XML entities. Originally the
+ * idea came from an Android project, because {@link android.text.Html Html}
+ * does not support all entities or like i.e. '&#8222;'
+ * (<code>&amp;bdquo;</code> or <code>&amp;#8222;</code>).
  * <p>
- * This utility class encodes and decodes HTML and XML entities. The idea came
- * from an Android project, because {@link android.text.Html Html} does not
- * support all tags or like i.e. '&#8222;' (<code>&amp;bdquo;</code> or
- * <code>&amp;#8222;</code>) and is just too complex for this purpose.
- * </p>
+ * Version 2.0 is completely rewritten. It now uses {@link Reader} and
+ * {@link Writer} for better performance and less memory footprint.
  * <p>
- * The goal is highly performant conversion with a minimum of memory footprint.
- * It is best for frequently usage of relatively short strings like you will
- * find in XML or HTML text elements or attribute values. So Regular Expressions
- * are not an option. <br/>
- * It does not yet support streaming. May be later.
- * </p>
+ * Limits:
+ * <ol>
+ * <li>{@link Entities} does not fix broken entities like <code>&amp;xAD;</code>
+ * (here a <code>#</code> is missing)</li>
+ * <li>Not all entities from <a href=
+ * "https://dev.w3.org/html5/html-author/charref">https://dev.w3.org/html5/html-author/charref</a>
+ * are supported yet</li>
+ * </ol>
  * <p>
- * The flow is optimized for the most probably occurence of characters in Roman
- * languages, which means ASCII characters lower than 128 are most expected.
- * </p>
+ * <i>Note 1:</i> the code is written for <b>Java 1.6</b> to keep it
+ * Android-ready.
  * <p>
- * An apdaption for the Android platform would utilize {@link SparseArray}
- * instead of {@link java.util.Map Map&lt;Integer, String&gt;} for the private
- * <code>encodeMap</code>.
- * </p>
- * 
+ * <i>Note 2:</i> an apdaption for the Android platform might utilize
+ * {@link android.util.SparseArray android.util.SparseArray} instead of
+ * {@link java.util.Map Map&lt;Integer, String&gt;} for the internal
+ * {@link #encodeMap}.
+ * <p>
  * <b>License:</b><br/>
- * <span style="padding-left: 3em;"><a href="http://opensource.org/licenses/isc-license.txt">ISC License</a></span>
+ * <span style="padding-left: 3em;"><a href=
+ * "http://opensource.org/licenses/isc-license.txt">ISC License</a></span>
  * 
- * @version 1.0
+ * @version 2.0
  * @author <a href="mailto:dittmar.steiner@gmail.com">Dittmar Steiner</a>
  */
 public class Entities {
     
+    Entities() {
+        // nothing to see here
+    }
+
     /**
-     * The acual map size is 252.
-     * <br/>
-     * The size + 1 will never reach the load factor limit and it will keep
-     * incedibly fast.
-     * (255 looks nicer and we have only two <code>null</code> references)
+     * The convenient version of {@link #encodeHtml(Reader, Writer)} for small
+     * {@link String}s.
+     * 
+     * @param str
+     *            the String to encode
+     * @return the encoded String
+     * 
+     * @see #encodeHtml(Reader, Writer)
+     * @since 1.0
      */
-    private static final int mapSize = 0xFF;
-    
+    public static String encodeHtml(String str) {
+        return encode(str, false, false);
+    }
+
+    /**
+     * Encodes all basic XML and characters &gt; 127 to all known HTML entities
+     * like <code>'&Auml;'</code> to <code>&amp;Auml;</code>. Otherwise escapes
+     * them to <code>'&amp;#<i>&lt;integer&gt;</i>;'</code> like
+     * <code>'&#666;'</code> to <code>&amp;#666;</code>.
+     * 
+     * @param reader will be closed
+     * @param writer will be closed
+     * @throws IOException
+     * 
+     * @see  #encodeHtml(String)
+     */
+    public static void encodeHtml(Reader reader, Writer writer)
+            throws IOException {
+        encode(reader, writer, false, false);
+    }
+
+    /**
+     * The convenient version of {@link #encodeXml(Reader, Writer)} for small
+     * {@link String}s.
+     * 
+     * @param str
+     *            the String to encode
+     * @return the encoded Unicode-String
+     * 
+     * @see #encodeXml(Reader, Writer)
+     * @since 1.0
+     */
+    public static String encodeXml(String str) {
+        return encode(str, true, false);
+    }
+
+    /**
+     * Encodes all basic XML characters to entities like <code>'&lt;'</code> to
+     * <code>&amp;lt;</code>. All characters &gt; 127 are not encoded (unicode
+     * as is).<br/>
+     * <i>Except</i> the soft hyphen (<i>shy</i>) which will be encodes as
+     * <code>&amp;#173;</code> just to make it visible.<br/>
+     * (I really like hyphenation especially for small screens!)
+     * 
+     * @param reader
+     *            will be closed
+     * @param writer
+     *            will be closed
+     * @throws IOException
+     * 
+     * @see #encodeXml(String)
+     */
+    public static void encodeXml(Reader reader, Writer writer)
+            throws IOException {
+        encode(reader, writer, true, false);
+    }
+
+    /**
+     * The convenient version of {@link #encodeAsciiXml(Reader, Writer)} for
+     * short {@link String}s.
+     * 
+     * @param str
+     *            the String to encode
+     * @return the encoded ASCII-String
+     * 
+     * @see #encodeAsciiXml(Reader, Writer)
+     * @since 1.0
+     */
+    public static String encodeAsciiXml(String str) {
+        return encode(str, true, true);
+    }
+
+    /**
+     * Encodes like {@link #encodeXml(Reader, Writer)} plus all characters &gt;
+     * 127 in the form of <code>&amp;#<i>decimal</i>;</code> like
+     * <code>&amp;#173;</code>.
+     * 
+     * @param reader
+     *            will be closed
+     * @param writer
+     *            will be closed
+     * @throws IOException
+     * 
+     * @see #encodeXml(Reader, Writer)
+     */
+    public static void encodeAsciiXml(Reader reader, Writer writer)
+            throws IOException {
+        encode(reader, writer, true, true);
+    }
+
+    static String encode(String str, boolean xml, boolean ascii) {
+        if (str == null) {
+            return "";
+        }
+
+        try {
+            Reader reader = new StringReader(str);
+            Writer writer = new StringWriter();
+            encode(reader, writer, xml, ascii);
+
+            return writer.toString();
+        }
+        catch (IOException e) {
+            // will never happen
+            return null;
+        }
+    }
+
+    static void encode(Reader reader, Writer writer, boolean xml, boolean ascii)
+            throws IOException {
+        try {
+            for (char c; (c = (char) reader.read()) < Character.MAX_VALUE;) {
+                // markup basic
+                if (c < 128) {
+                    switch (c) {
+                        case lt:
+                            writer.append(ltEnt);
+                            continue;
+                        case gt:
+                            writer.append(gtEnt);
+                            continue;
+                        case amp:
+                            writer.append(ampEnt);
+                            continue;
+                        case quot:
+                            writer.append(quotEnt);
+                            continue;
+                        case apos:
+                            writer.append(aposEnt);
+                            continue;
+                    }
+                }
+
+                String entity = !ascii && !xml ? encodeMap.get((int)c) : null;
+                if (entity == null) {
+                    // 0x00AD: we always guarantee the visibility of the shy char as &#173;
+                    if ((ascii || c == 0x00AD) && c > 127) {
+                        writer.append("&#").append(Integer.toString(c))
+                                .append(";");
+
+                        continue;
+                    }
+                    writer.append(c);
+                }
+                else {
+                    writer.append(entity);
+                }
+            }
+        }
+        finally {
+            try { reader.close(); } catch (IOException e) {}
+            try { writer.close(); } catch (IOException e) {}
+        }
+    }
+
+    /**
+     * The convenient version of {@link #decode(Reader, Writer)} for small
+     * {@link String}s.
+     * 
+     * @param encoded
+     *            XML or HTML String to decode
+     * @return the decoded Unicode-String
+     * 
+     * @see #decode(Reader, Writer)
+     * @since 1.0
+     */
+    public static String decode(final String encoded) {
+        if (encoded.indexOf(amp) < 0) {
+            // as is
+            return encoded;
+        }
+
+        try {
+            StringReader reader = new StringReader(encoded);
+            StringWriter writer = new StringWriter();
+            new Decoder(reader, writer).decode();
+
+            return writer.toString();
+        }
+        catch (Exception e) {
+            // will never happen with a StringWriter
+            return null;
+        }
+    }
+
+    /**
+     * For example <code>&amp;Auml;</code> or <code>&amp;#196;</code> or
+     * <code>&amp;#xC4;</code> are decoded to an &#196;
+     * <p>
+     * For small {@link String}s use {@link #decode(String)}.
+     * 
+     * @param reader
+     *            will be closed
+     * @param writer
+     *            will be closed
+     * @throws IOException
+     * @see #decode(String)
+     */
+    public static void decode(Reader reader, Writer writer) throws IOException {
+        new Decoder(reader, writer).decode();
+    }
+
+    static class Decoder {
+        static final String stopChars = "\t\f\r\n &;";
+
+        final Reader reader;
+        final Writer writer;
+        StringBuilder buf;
+
+        Decoder(Reader reader, Writer writer) {
+            this.reader = reader;
+            this.writer = writer;
+        }
+
+        void decode() throws IOException {
+            try {
+                for (char c; (c = (char) reader.read()) < Character.MAX_VALUE; ) {
+                    if (c != amp) {
+                        decode(c);
+                    }
+                    else {
+                        buf = buf == null ? new StringBuilder() : buf;
+
+                        buf.append(c);
+                    }
+                }
+
+                if (buf != null) {
+                    writer.append(buf);
+                }
+            }
+            finally {
+                try { reader.close(); } catch (IOException e) {}
+                try { writer.close(); } catch (IOException e) {}
+            }
+        }
+
+        void decode(char c) throws IOException {
+            if (buf == null) {
+                writer.append(c);
+
+                return;
+            }
+
+            buf.append(c);
+
+            if (stopChars.indexOf(c) >= 0) {
+                Integer code = valueOf(c, buf);
+
+                if (code != null) {
+                    writer.append((char) code.intValue());
+                }
+                else {
+                    // could not decode, therefore as is
+                    writer.append(buf);
+                }
+
+                buf = null;
+            }
+            else if (buf.length() > 10) {
+                writer.append(buf);
+                buf = null;
+            }
+        }
+
+        static Integer valueOf(char c, StringBuilder entity) {
+            Integer code;
+            // definitely closing
+            if (c == semicolon && entity.charAt(1) == '#') {
+                try {
+                    if (entity.charAt(2) == 'x' && entity.length() > 2) {
+                        // example: &#xAD;
+                        code = Integer.valueOf(
+                                entity.substring(3, entity.length() - 1), 16);
+                    }
+                    else {
+                        // example: &#173;
+                        code = Integer.valueOf(
+                                entity.substring(2, entity.length() - 1));
+                    }
+                }
+                catch (NumberFormatException e) {
+                    code = null;
+                }
+            }
+            else {
+                code = decodeMap.get(entity.toString());
+            }
+
+            return code;
+        }
+    }
+
+    static final int initialMapSize = 0xFF;
+
     /**
      * For direct addressing to optimize for probability <code>char &lt; 128</code>
      */
-    private static final int lt = '<', gt = '>', 
+    static final int lt = '<', gt = '>',
             amp = '&', quot = '"', apos = '\'', semicolon = ';';
     /**
      * For direct addressing to optimize for probability <code>char &lt; 128</code>
      */
-    private static final String ltEnt = "&lt;", gtEnt = "&gt;", 
-            ampEnt = "&amp;", quotEnt = "&quot;", aposEnt = "&apos;"; 
-    
+    static final String ltEnt = "&lt;", gtEnt = "&gt;",
+            ampEnt = "&amp;", quotEnt = "&quot;", aposEnt = "&apos;";
+
     /**
-     * Contains all codes and entities from <a
-     * href="http://www.w3.org/2003/entities/2007xml/unicode.xml"
+     * Contains all codes and entities from
+     * <a href="http://www.w3.org/2003/entities/2007xml/unicode.xml"
      * >http://www.w3.org/2003/entities/2007xml/unicode.xml</a>
+     * <p>
+     * TODO: not all 1448 entities from <a href=
+     * "https://dev.w3.org/html5/html-author/charref">https://dev.w3.org/html5/html-author/charref</a>
+     * are supported yet.
      */
-    private static final Map<Integer, String> encodeMap = 
-            new HashMap<>(mapSize);
+    static final Map<Integer, String> encodeMap =
+            new HashMap<Integer, String>(initialMapSize);
     // populate
     static {
         // predefined XML entities
@@ -89,7 +402,7 @@ public class Entities {
         encodeMap.put(amp, ampEnt);
         encodeMap.put(quot, quotEnt);
         encodeMap.put(apos, aposEnt);
-        
+
         // HTML 4.0.1 entities
         encodeMap.put(193, "&Aacute;");
         encodeMap.put(225, "&aacute;");
@@ -340,244 +653,17 @@ public class Entities {
         encodeMap.put(8205, "&zwj;");
         encodeMap.put(8204, "&zwnj;");
     }
-    
+
     /**
      * The revese version of {@link #encodeMap}.
      */
-    private static final Map<String, Integer> decodeMap = new HashMap<>(mapSize);
-    // transfer key/values
+    static final Map<String, Integer> decodeMap =
+            new HashMap<String, Integer>(initialMapSize);
+    // map value:key
     static {
             Set<Integer> codes = encodeMap.keySet();
             for (Integer code : codes) {
                 decodeMap.put(encodeMap.get(code), code);
             }
-    }
-    
-    /**
-     * Encodes all basic XML and characters &gt; 127 to all known HTML entities
-     * like <code>'&Auml;'</code> to <code>&amp;Auml;</code>. Otherwise escapes
-     * them to <code>'&amp;#&lt;integer&gt;;'</code> like
-     * <code>'&#666;'</code> to <code>&amp;#666;</code>.
-     * 
-     * @param str
-     *            the String to encode
-     * @return the encoded String
-     * 
-     * @see #encodeXml(String)
-     */
-    public static String encodeHtml(String str) {
-        return encode(str, false, false);
-    }
-    
-    /**
-     * Encodes all basic XML characters to entities <code>'&lt;'</code> to
-     * <code>&amp;lt;</code>. All characters &gt; 127 are not encoded (unicode
-     * as is)<br/>
-     * <i>Except</i> the soft hyphen (<i>shy</i>) which will be
-     * encodes as <code>&amp;#173;</code> just to make it visible.<br/>
-     * (I really like hyphenation especially for small screens!)
-     * 
-     * @param str
-     *            the String to encode
-     * @return the encoded Unicode-String
-     */
-    public static String encodeXml(String str) {
-        return encode(str, true, false);
-    }
-    
-    /**
-     * Just like {@link #encodeXml(String)} plus all characters &gt; 127 in the
-     * form of <code>'&amp;#&lt;integer&gt;;'</code>.
-     * 
-     * @param str
-     *            the String to encode
-     * @return the encoded ASCII-String
-     */
-    public static String encodeAsciiXml(String str) {
-        return encode(str, true, true);
-    }
-    
-    /**
-     * Here the actual conversion is done. All condition and conversion are
-     * inline to avoid method calls.
-     * 
-     * @param str
-     * @param xml false for HTML
-     * @param ascii do not keep any unicode char &gt; 127
-     * @return
-     */
-    private static String encode(String str, boolean xml, boolean ascii) {
-        if (str == null) {
-            return "";
-        }
-        
-        // size * 1.2 is just a guess, not based on empirical data
-        final StringBuilder builder = new StringBuilder((int)(str.length() * 1.2));
-        
-        for (int i = 0; i < str.length(); ++i) {
-            char c = str.charAt(i);
-            
-            // xml basic
-            if (c < 128) {
-                switch (c) {
-                case lt:
-                    builder.append(ltEnt);
-                    continue;
-                case gt:
-                    builder.append(gtEnt);
-                    continue;
-                case amp:
-                    builder.append(ampEnt);
-                    continue;
-                case quot:
-                    builder.append(quotEnt);
-                    continue;
-                case apos:
-                    builder.append(aposEnt);
-                    continue;
-                }
-            }
-            
-            // xml
-            if (xml) {
-                if (c < 128) {
-                    builder.append(c);
-                }
-                else {
-                    if (!ascii) {
-                        if (c != 0x00AD) {
-                            builder.append(c);
-                        }
-                        else {
-                            // we always escape the shy char (0x00AD or #173) to make it visible
-                            escape(c, builder);
-                        }
-                    }
-                    else {
-                        escape(c, builder);
-                    }
-                }
-                continue;
-            }
-            
-            // html
-            String entity = !ascii ? encodeMap.get((int)c) : null;
-            if (entity == null) {
-                if (c < 128) {
-                    builder.append(c);
-                }
-                else {
-                    if (ascii) {
-                        escape(c, builder);
-                    }
-                    else {
-                        builder.append(c);
-                    }
-                }
-            }
-            else {
-                builder.append(entity);
-            }
-        }
-        
-        return builder.toString();
-    }
-    
-    /**
-     * The only little helper method do encode linke '&#666;' to '&amp;#666;'
-     * @param c
-     * @param builder
-     */
-    private static void escape(int c, StringBuilder builder) {
-        builder.append("&#");
-        builder.append(Integer.toString(c));
-        builder.append(";");
-    }
-    
-    /**
-     * For example <code>&amp;Auml;</code>, <code>&amp;#196;</code> and
-     * <code>&amp;#xC4;</code> are decoded to &#196;
-     * 
-     * @param encoded
-     *            XML or HTML String to decode
-     * @return the decoded Unicode-String
-     */
-    public static String decode(final String encoded) {
-        if (encoded.indexOf(amp) == -1) {
-            // no StringBuilder allocation required
-            return encoded;
-        }
-        
-        final StringBuilder builder = new StringBuilder(encoded.length());
-        
-        for (int i = 0; i < encoded.length(); ++i) {
-            final char c = encoded.charAt(i);
-            
-            if (c != amp) {
-                builder.append(c);
-            }
-            else {
-                final int sOffset = encoded.indexOf(semicolon, i + 1);
-                
-                // min length is 4 like "&lt;"
-                // max length: "&thetasym;" and "&#x000e4;" are possible, 
-                // otherwise this would just be a sentence.
-                if (sOffset < i + 3 || sOffset >= i + 10) {
-                    builder.append(c);
-                    continue;
-                }
-                
-                String entity = encoded.substring(i, sOffset + 1);
-                if (
-                        entity.indexOf(amp)  >  0 ||
-                        entity.indexOf(' ')  > -1 ||
-                        entity.indexOf('\t') > -1 ||
-                        entity.indexOf('\f') > -1 ||
-                        entity.indexOf('\r') > -1 ||
-                        entity.indexOf('\n') > -1
-                    ) {
-                    // not a valid entity name
-                    builder.append(c);
-                    continue;
-                }
-                
-                Integer code;
-                if (entity.charAt(1) == '#') {
-                    try {
-                        if (entity.charAt(2) == 'x') {
-                            // example: &#xAD;
-                            code = Integer.valueOf(
-                                    entity.substring(3, entity.length() - 1)
-                                    , 16);
-                        }
-                        else {
-                            // example: &#173;
-                            code = Integer.valueOf(
-                                    entity.substring(2, entity.length() - 1)
-                                    );
-                        }
-                    }
-                    catch (NumberFormatException e) {
-                        code = null;
-                    }
-                    catch (StringIndexOutOfBoundsException e) {
-                        code = null;
-                    }
-                }
-                else {
-                    code = (Integer)decodeMap.get(entity);
-                }
-                
-                if (code == null) {
-                    builder.append(entity);
-                }
-                else {
-                    builder.append((char) code.intValue());
-                }
-                
-                i = sOffset;
-            }
-        }
-        return builder.toString();
     }
 }

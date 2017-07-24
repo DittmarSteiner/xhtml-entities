@@ -1,25 +1,19 @@
 XHTML Entities
 ==========================
 
-This utility class encodes and decodes HTML and XML entities. The idea came from 
-an Android project, because {@link android.text.Html Html} does not support all 
-tags or like i.e. '&#8222;' (`&amp;bdquo;` or `&amp;#8222;`) and is just too 
-complex for this purpose.
+This utility class encodes and decodes HTML and XML entities. Originally the idea came from an Android project, because `android.text.Html` does not support all entities or like i.e. '„' (`&bdquo;` or `&#8222;`).  
+Version 2.0 is completely rewritten. It now uses Reader and Writer for better performance and less memory footprint.
 
-The goal is highly performant conversion with a minimum of memory footprint.
-It is best for frequently usage of relatively short strings like you will
-find in XML or HTML text elements or attribute values. So Regular Expressions
-are not an option.  
-It does not yet support streaming. May be later.
+Limits:
 
-The flow is optimized for the most probably occurence of characters in Roman
-languages, which means ASCII characters lower than 128 are most expected.
+1. `Entities` does not fix broken entities like `&xAD;` (here a `#` is missing) 
+2. Not all entities from 
+[https://dev.w3.org/html5/html-author/charref](https://dev.w3.org/html5/html-author/charref) 
+are supported yet
 
-An apdaption for the Android platform would utilize 
-[SparseArray](http://developer.android.com/reference/android/util/SparseArray.html)
-instead of 
-[Map&lt;String, Integer&gt;](http://docs.oracle.com/javase/6/docs/api/java/util/Map.html) 
-for the private `encodeMap`.
+Note 1: the code is written for **Java 1.6** to keep it Android-ready.
+
+Note 2: an apdaption for the Android platform might utilize `android.util.SparseArray` instead of `Map<Integer, String>` for the internal `encodeMap`.
 
 License
 =======

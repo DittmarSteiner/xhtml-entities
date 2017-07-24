@@ -3,10 +3,10 @@
 
     <groupId>com.github.dittmarsteiner</groupId>
     <artifactId>xhtml-entities</artifactId>
-    <version>1.1-SNAPSHOT</version>
+    <version>2.0</version>
 
     <name>XHTML Entities</name>
-    <description>Unescapes X(H)TML entities and vice versa.</description>
+    <description>Unescapes X(HT)ML entities and vice versa.</description>
 
     <licenses>
         <license>
@@ -31,7 +31,7 @@
         <connection>scm:git:https://github.com/dittmarsteiner/xhtml-entities.git</connection>
         <developerConnection>scm:git:git@github.com:dittmarsteiner/xhtml-entities.git</developerConnection>
         <url>https://github.com/dittmarsteiner/xhtml-entities</url>
-        <tag>1.0</tag>
+        <tag>2.0</tag>
     </scm>
 
     <distributionManagement>
@@ -43,9 +43,10 @@
 
     <properties>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
-        <java.version>1.8</java.version>
+        <java.version.source>1.6</java.version.source>
+        <java.version.target>1.8</java.version.target>
     </properties>
-    
+
     <profiles>
         <profile>
             <id>release</id>
@@ -79,30 +80,33 @@
     </profiles>
 
     <build>
-<!--         <finalName>${project.artifactId}</finalName> -->
         <defaultGoal>package</defaultGoal>
 
         <plugins>
+            <!-- https://maven.apache.org/plugins/maven-compiler-plugin/ -->
             <plugin>
                 <artifactId>maven-compiler-plugin</artifactId>
-                <version>3.2</version>
+                <version>3.6.1</version>
                 <configuration>
-                    <source>${java.version}</source>
-                    <target>${java.version}</target>
+                    <source>${java.version.source}</source>
+                    <target>${java.version.target}</target>
                 </configuration>
             </plugin>
 
+            <!-- https://maven.apache.org/plugins/maven-javadoc-plugin/ -->
             <!-- $ mvn javadoc:javadoc -->
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-javadoc-plugin</artifactId>
-                <version>2.10.1</version>
+                <version>2.10.4</version>
                 <configuration>
+                    <links>
+                        <link>https://developer.android.com/reference/</link>
+                    </links>
                     <links>
                         <link>https://docs.oracle.com/javase/8/docs/api/</link>
                     </links>
-                    <show>protected</show>
-                    <additionalparam>-Xdoclint:none</additionalparam>
+                    <show>public</show>
                 </configuration>
                 <executions>
                     <execution>
@@ -115,15 +119,16 @@
                 </executions>
             </plugin>
 
+            <!-- https://maven.apache.org/maven-release/maven-release-plugin/ -->
             <plugin>
                 <artifactId>maven-release-plugin</artifactId>
-                <version>2.5.1</version>
+                <version>2.5.3</version>
                 <configuration>
                     <useReleaseProfile>false</useReleaseProfile>
                     <releaseProfiles>release</releaseProfiles>
                     <autoVersionSubmodules>true</autoVersionSubmodules>
                 </configuration>
-            </plugin>            
+            </plugin>
         </plugins>
 
         <resources>
@@ -142,10 +147,11 @@
     </build>
 
     <dependencies>
+        <!-- https://mvnrepository.com/artifact/junit/junit -->
         <dependency>
             <groupId>junit</groupId>
             <artifactId>junit</artifactId>
-            <version>[4.12,)</version>
+            <version>4.12</version>
             <scope>test</scope>
         </dependency>
     </dependencies>
